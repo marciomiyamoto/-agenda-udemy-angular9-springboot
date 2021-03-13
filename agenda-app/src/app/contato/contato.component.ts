@@ -2,6 +2,10 @@ import { Component, OnInit } from '@angular/core';
 import { ContatoService } from '../contato.service';
 import { Contato } from './contato';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { MatDialog } from '@angular/material/dialog';
+import{ ContatoDetalheComponent } from '../contato-detalhe/contato-detalhe.component';
+import { PageEvent } from '@angular/material/paginator';
+import { MatSnackBar } from '@angular/material/snack-bar';
 
 @Component({
   selector: 'app-contato',
@@ -12,23 +16,31 @@ export class ContatoComponent implements OnInit {
 
   formulario: FormGroup;
   contatos: Contato[] = [];
-  colunas = ['id','nome','email','favorito'];
+  colunas = ['foto','id','nome','email','favorito'];
+  totalElementos = 0;
+  pagina = 0;
+  tamanho = 5;
+  pageSizeOptions: number[] = [5,10,15];
 
   constructor(
     private service: ContatoService,
-    private fb: FormBuilder
+    private fb: FormBuilder,
+    private dialog: MatDialog,
+    private snackBar: MatSnackBar
   ) { }
 
   ngOnInit(): void { 
     this.montarFormulario();
-    this.listarContatos();
+    this.listarContatos(this.pagina, this.tamanho);
   }
 
-  listarContatos() {
-    this.service.list()
+  listarContatos(pagina = 0, tamanho = 5) {
+    this.service.list(pagina, tamanho)
     .subscribe( response => {
-      this.contatos = response;
-    })
+      this.contatos = response.content;
+      this.totalElementos = response.totalElements;
+      this.pagina = response.number;
+    });
   }
 
   montarFormulario() {
@@ -45,8 +57,11 @@ export class ContatoComponent implements OnInit {
     this.service
     .save(contato)
     .subscribe( response => {
-      let lista: Contato[] = [...this.contatos, response];
-      this.contatos = lista;
+      this.listarContatos();
+      this.snackBar.open('O contato foi adicionado!', 'Sucesso!', {
+        duration: 2000
+      })
+      this.formulario.reset();
     });
   }
 
@@ -57,4 +72,28 @@ export class ContatoComponent implements OnInit {
       });
   }
 
+  uploadFoto(event, contato: Contato) {
+    const files = event.target.files;
+    if(files) {
+      const foto = files[0];
+      const formData: FormData = new FormData();
+      formData.append("foto", foto);
+      this.service
+        .upload(contato, formData)
+        .subscribe( response => this.listarContatos());
+    }
+  }
+
+  visualizarContato(contato: Contato) {
+    this.dialog.open(ContatoDetalheComponent, {
+      width: '400px',
+      height: '450px',
+      data: contato
+    })
+  }
+
+  paginar(event: PageEvent) {
+    this.pagina = event.pageIndex;
+    this.listarContatos(this.pagina, this.tamanho);
+  }
 }
